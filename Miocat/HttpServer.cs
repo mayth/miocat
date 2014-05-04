@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Net;
 using System.Globalization;
@@ -50,7 +51,25 @@ namespace Miocat
 
             if (requestUri.AbsolutePath == "/")
             {
-                GenerateResponse(context.Response, 200, "hello.");
+                var helloHtml = "<!DOCTYPE html>" + Environment.NewLine
+                                + "<html>" + Environment.NewLine
+                                + "<head>" + Environment.NewLine
+                                + "  <title>miocat - accelerate your development</title>" + Environment.NewLine
+                                + "  <meta charset=\"UTF-8\">" + Environment.NewLine
+                                + "</head>" + Environment.NewLine
+                                + "<body>" + Environment.NewLine
+                                + "  <h1>" + Environment.NewLine
+                                + "    miocat" + Environment.NewLine
+                                + "    <small>Accelarate Your Development</small>" + Environment.NewLine
+                                + "  </h1>" + Environment.NewLine
+                                + "  <form action=\"/request\">" + Environment.NewLine
+                                + "    <input type=\"text\" name=\"target\" placeholder=\"Target URL\">" + Environment.NewLine
+                                + "<input type=\"hidden\" name=\"locale\" value=\"en-US\">" + Environment.NewLine
+                                + "    <button type=\"submit\">nya!</button>" + Environment.NewLine
+                                + "  </form>" + Environment.NewLine
+                                + "</body>" + Environment.NewLine
+                                + "</html>";
+                GenerateResponse(context.Response, 200, helloHtml);
             }
             else if (requestUri.AbsolutePath == "/request")
             {
@@ -65,11 +84,17 @@ namespace Miocat
         private static void ProcessRequest(HttpListenerContext context, Uri requestUri)
         {
             var query = ParseQuery(requestUri.Query);
+            Console.WriteLine("Requested {0} with:", requestUri.ToString());
+            foreach (var kv in query)
+            {
+                Console.WriteLine("  {0}: {1}", kv.Key, kv.Value);
+            }
             var culture = GetLocale(query);
             if (query.ContainsKey("target"))
             {
                 var target = query["target"];
-                if (IsFileUri(target, culture))
+                System.Threading.Thread.CurrentThread.CurrentCulture = culture;
+                if (IsFileUri(target))
                 {
                     GenerateResponse(context.Response, 500, "file: scheme is not acceptable.");
                     return;
@@ -77,7 +102,21 @@ namespace Miocat
                 var client = new WebClient();
                 try
                 {
+                    // client.Proxy = new WebProxy("88.255.234.109", 3128);
+                    client.Headers.Add(
+                        HttpRequestHeader.AcceptLanguage,
+                        System.Threading.Thread.CurrentThread.CurrentCulture.Name + ",en-US");
                     var content = client.DownloadString(target);
+                    var regex = new Regex("<title>(.+)</title>");
+                    if (regex.IsMatch(content))
+                    {
+                        content = regex.Replace(content, "<title>(miocat) $1</title>");
+                    }
+                    else
+                    {
+                        var headRegex = new Regex("</head>");
+                        content = headRegex.Replace(content, "<title>(miocat) (no title)</title>\n</head>");
+                    }
                     GenerateResponse(context.Response, 200, content);
                 }
                 catch (WebException e)
@@ -111,6 +150,7 @@ namespace Miocat
                 }
                 catch (CultureNotFoundException)
                 {
+                    Console.Error.WriteLine("Locale Not Found");
                     // do nothing, so if the culture is not found, the invariant culture is used.
                     query.Remove("locale");
                 }
@@ -129,9 +169,9 @@ namespace Miocat
                 .ToDictionary(arr => arr[0], arr => Uri.UnescapeDataString(arr[1]));
         }
 
-        private static bool IsFileUri(string uri, CultureInfo culture)
+        private static bool IsFileUri(string uri)
         {
-            return uri.StartsWith("FILE:", true, culture);
+            return uri.StartsWith("FILE:", true, System.Threading.Thread.CurrentThread.CurrentCulture);
         }
     }
 }
