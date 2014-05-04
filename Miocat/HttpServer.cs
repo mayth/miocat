@@ -92,11 +92,21 @@ namespace Miocat
             var culture = GetLocale(query);
             if (query.ContainsKey("target"))
             {
-                var target = query["target"];
+                var target = query["target"].Trim();
                 System.Threading.Thread.CurrentThread.CurrentCulture = culture;
+                if (string.IsNullOrWhiteSpace(target))
+                {
+                    GenerateResponse(context.Response, 500, "empty target.");
+                    return;
+                }
                 if (IsFileUri(target))
                 {
-                    GenerateResponse(context.Response, 500, "file: scheme is not acceptable.");
+                    GenerateResponse(context.Response, 500, "not acceptable.");
+                    return;
+                }
+                else if (!IsHttpUri(target) || !IsHttpsUri(target))
+                {
+                    GenerateResponse(context.Response, 500, "not acceptable.");
                     return;
                 }
                 var client = new WebClient();
@@ -172,6 +182,16 @@ namespace Miocat
         private static bool IsFileUri(string uri)
         {
             return uri.StartsWith("FILE:", true, System.Threading.Thread.CurrentThread.CurrentCulture);
+        }
+
+        private static bool IsHttpUri(string uri)
+        {
+            return uri.StartsWith("HTTP:", true, System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        private static bool IsHttpsUri(string uri)
+        {
+            return uri.StartsWith("HTTPS:", true, System.Globalization.CultureInfo.InvariantCulture);
         }
     }
 }
