@@ -99,12 +99,12 @@ namespace Miocat
                     GenerateResponse(context.Response, 500, "empty target.");
                     return;
                 }
-                if (IsFileUri(target))
+                if (!System.Text.RegularExpressions.Regex.IsMatch(target, "^[a-zA-Z]+://.*$"))
                 {
                     GenerateResponse(context.Response, 500, "not acceptable.");
                     return;
                 }
-                else if (!IsHttpUri(target) || !IsHttpsUri(target))
+                if (IsFileUri(target))
                 {
                     GenerateResponse(context.Response, 500, "not acceptable.");
                     return;
